@@ -56,8 +56,12 @@ var CurrencyConverter = (function () {
             var options, rateFrom, rateTo, rate;
 
             options = __self.getOptions();
-            from = from || options.base;
-            to = to.toUpperCase();
+            try {
+                from = (from || options.base).toUpperCase();
+                to = to.toUpperCase();
+            } catch (e) {
+                throw new Error('Переданы или установлены некорретные валюты');
+            }
 
             rateFrom = options.rates[from] || null;
             rateTo = options.rates[to] || null;
@@ -66,6 +70,7 @@ var CurrencyConverter = (function () {
                 throw new Error('Отсутствует курс для указанной валюты');
             }
             rate = rateFrom / rateTo;
+
             return value * rate;
         };
 
