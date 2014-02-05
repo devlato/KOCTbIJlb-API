@@ -1,6 +1,15 @@
 /**
      * Типа базовый класс для внешних говнофильтров, хотя по идее его тоже можно бы инстанцировать
      * с правильными настройками, и он вроде как будет работать, но я зачем-то это запретил
+     *
+     * TODO не показывать кнопку и список и не рендерить, если нет данных, хотя штуку с кнопкой
+     *      лучше оставить отдельным реализациям, как сейчас, но с некоторыми оговорками
+     * TODO фильтр поиска по тексторому полю с фильтрацией по visible
+     * TODO сброс visible и прочих полей при выставлении свежих данных, но это нужно продумать
+     * TODO метод externalFilter для применения к данным других совместимых внешних
+     *      фильтров-наследников BaseFilter
+     * TODO методы beforeFilter и afterFilter для пред- и пост-обработки данных
+     * TODO запилить совместимую фильтрацию в новую BTable
      */
     var BaseFilter = function(container, options) {
         var __self, __container, __options, __instantiationPreventionByNamespace;
@@ -13,6 +22,10 @@
             onFilter: false,
             namespace: __instantiationPreventionByNamespace,
             values: {},
+            css: {},
+            classes: {
+                topContainer: 'filter-top-container'
+            },
             events: {
                filterOn: 'change'
             },
@@ -21,13 +34,14 @@
             },
             title: 'Выберите элементы',
             templates: {
+                container: '<div class="<%= options.classes.topContainer %>"></div>',
                 content: false
             }
         };
 
         BaseFilter.prototype.__construct__ = function(container, options) {
-            __self.setContainer(container);
             __self.setOptions(options);
+            __self.setContainer(container);
             options = __self.getOptions();
             if (options.namespace == __instantiationPreventionByNamespace) {  // Это вообще пушка, даже стыдно за такое
                 throw new Error('Ошибка: Невозможно инстанцировать абстрактный класс BaseFilter');
@@ -37,11 +51,9 @@
             return __self;
         };
 
-        BaseFilter.prototype.__destroy__ = function() {
-            __self.unbind();
-        };
-
         BaseFilter.prototype.setContainer = function(container) {
+            var options = __self.getOptions();
+            container = container || options.vendor.render(options.templates.container, {options: options});
             __container = $(container);
             return __self;
         };
@@ -61,9 +73,16 @@
         };
 
         BaseFilter.prototype.render = function(data) {
+            var options, container;
             try {
-                var options = __self.getOptions();
-                __container.html(options.vendor.render(options.templates.content, {items: data, options: options}));  // Ололо
+                container = __self.getContainer();
+                if (!$.isEmptyObject(data)) {
+                    options = __self.getOptions();
+                    container.html(options.vendor.render(options.templates.content, {items: data, options: options}));  // Ололо
+                } else {
+                    container.empty();
+                }
+                container.css(options.css);
             } catch (e) {
                 console.log(e);
             }
@@ -85,15 +104,17 @@
 
         BaseFilter.prototype.bind = function() {
             var options = __self.getOptions();
+            var container = __self.getContainer();
             var filter = __self.getEventNameWithNamespace(options.events.filterOn);
-            __container.on(filter, __self.onFilter);
+            container.on(filter, __self.onFilter);
             return __self;
         };
 
         BaseFilter.prototype.unbind = function() {
             var options = __self.getOptions();
+            var container = __self.getContainer();
             var filter = __self.getEventNameWithNamespace(options.events.filterOn);
-            __container.off(filter);
+            container.off(filter);
             return __self;
         };
 
@@ -111,7 +132,18 @@
         };
 
         BaseFilter.prototype.getFilter = function() {
-            return __container.val();
+            var container = __self.getContainer();
+            return container.val();
+        };
+
+        BaseFilter.prototype.moveNodes = function(where) {
+            where = $(where);
+            var container = __self.getContainer();
+            container.appendTo(where);
+        };
+
+        BaseFilter.prototype.byClass = function(className) {
+            return '.' + className;
         };
 
         return __self.__construct__(container, options);
@@ -203,10 +235,6 @@
             }
         };
 
-        CheckboxFilter.prototype.byClass = function(className) {
-            return '.' + className;
-        };
-
         CheckboxFilter.prototype.bind = function() {
             var context = __parent.bind();
             var options = __self.getOptions();
@@ -239,12 +267,17 @@
         SelectFilter.prototype.defaultOptions = $.extend(true, {}, __parent.defaultOptions, {
             namespace: 'filter.selectBased',
             chosen: {
-                disable_search_threshold: 10
+                minimumResultsForSearch: 10,
+                placeholder: 'Выберите раздел',
+                dropdownCssClass: 'filter-selectBased',
+                containerCssClass: 'select2-container',
+                allowClear: true
             },
             templates: {
+                container: '<select data-placeholder="Выберите раздел" class="<%= options.classes.topContainer %>"><option></option></select>',
                 content: '<option></option>\
                           <option value="__all">Все</option>\
-                          <% _.each(items, function(item) { %>\
+                          <% _.each(items, function(item) { %> \
                               <option value="<%= item.key %>"><%= item.value %></option>\
                           <% }); %>'
             }
@@ -252,16 +285,34 @@
 
         SelectFilter.prototype.update = function(values) {
             var context = __parent.update(values);
-            container.trigger('liszt:updated');
+            var options = __self.getOptions();
+            // container.trigger('liszt:updated');
+            container.select2(options.chosen);
+            container.hide();
             return context;
         };
 
         SelectFilter.prototype.bind = function() {
+            var options = __self.getOptions();
             var context = __parent.bind();
             container = __self.getContainer();
-            container.chosen(options.chosen);
+            // container.select2(options.chosen);
             return context;
+        };
+
+        SelectFilter.prototype.getFilter = function() {
+            var container = __self.getContainer();
+            return [container.val()];
+        };
+
+        SelectFilter.prototype.moveNodes = function(where) {
+            where = $(where);
+            var container = __self.getContainer();
+            var options = __self.getOptions();
+            container.siblings(__self.byClass(options.chosen.containerCssClass)).appendTo(where);
+            container.appendTo(where);
         };
 
         __parent.constructor.call(__self, container, $.extend(true, {}, __self.defaultOptions, options));
     }, BaseFilter);
+    
