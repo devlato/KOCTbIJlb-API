@@ -1,9 +1,6 @@
-/**
- * @see  http://www.semrush.com/admin/{db_name}/products/edit/{product_id}
- */
 
 
-define('app/admin/corporate-accounts', ['underscore', 'backbone', 'jquery'], function(_, Backbone, $) {
+define('app/empty', ['underscore', 'backbone', 'jquery'], function(_, Backbone, $) {
 	'use strict';
 
 
